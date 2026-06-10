@@ -60,6 +60,9 @@ class BoardTest extends TestCase
             ->assertSee('data-eraser-size="52"', false)
             ->assertSee('destination-out')
             ->assertSee('data-brush="highlighter"', false)
+            ->assertSee('id="undo"', false)
+            ->assertSee('const historyLimit = 50')
+            ->assertSee('event.key.toLowerCase()')
             ->assertSee('whiteboard-theme')
             ->assertSee(str_replace('/', '\/', route('api.boards.update', $boardId)), false);
 

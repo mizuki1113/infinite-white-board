@@ -156,6 +156,22 @@
             background: #357dc7;
         }
 
+        .undo-button:disabled {
+            opacity: 0.42;
+            cursor: not-allowed;
+        }
+
+        .undo-button:disabled:hover {
+            background: transparent;
+        }
+
+        .shortcut-text {
+            margin-left: 5px;
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            font-weight: 600;
+        }
+
         .theme-toggle {
             width: 34px;
             padding: 0;
@@ -513,6 +529,7 @@
 
         <div class="navbar-actions">
             <a class="pill-link" href="{{ route('boards.index') }}"><span class="board-list-label">Board </span>List</a>
+            <button id="undo" class="pill undo-button" type="button" disabled>Undo <span class="shortcut-text">Ctrl+Z</span></button>
             <button id="save" class="pill save-button" type="button">Save</button>
             <button id="theme-toggle" class="pill theme-toggle" type="button" aria-label="Toggle light and dark mode">☀</button>
         </div>
@@ -611,6 +628,7 @@
             const container = document.getElementById('canvas-container');
             const boardNameInput = document.getElementById('board-name');
             const themeToggle = document.getElementById('theme-toggle');
+            const undoButton = document.getElementById('undo');
             const zoomText = document.getElementById('zoom-text');
             const status = document.getElementById('status');
             const toolButtons = Array.from(document.querySelectorAll('.tool-button'));
@@ -644,6 +662,9 @@
             let saving = false;
             let statusTimer = null;
             let textEditor = null;
+            let actionChanged = false;
+            const undoHistory = [];
+            const historyLimit = 50;
 
             const createEmptyStage = () => {
                 stage = new Konva.Stage({
@@ -709,6 +730,50 @@
 
             const markModified = () => {
                 modified = true;
+                actionChanged = true;
+            };
+
+            const updateUndoButton = () => {
+                undoButton.disabled = undoHistory.length <= 1;
+            };
+
+            const saveHistory = (force = false) => {
+                const snapshot = contentLayer.toJSON();
+                if (!force && undoHistory[undoHistory.length - 1] === snapshot) {
+                    actionChanged = false;
+                    return;
+                }
+
+                undoHistory.push(snapshot);
+                if (undoHistory.length > historyLimit) {
+                    undoHistory.shift();
+                }
+                actionChanged = false;
+                updateUndoButton();
+            };
+
+            const undo = () => {
+                if (undoHistory.length <= 1) {
+                    return;
+                }
+
+                if (textEditor) {
+                    textEditor.cancel();
+                }
+
+                undoHistory.pop();
+                const snapshot = undoHistory[undoHistory.length - 1];
+                selectShape(null);
+                contentLayer.destroy();
+                contentLayer = Konva.Node.create(snapshot) || new Konva.Layer();
+                stage.add(contentLayer);
+                uiLayer.moveToTop();
+                updateShapeInteraction();
+                contentLayer.batchDraw();
+                uiLayer.batchDraw();
+                modified = true;
+                actionChanged = false;
+                updateUndoButton();
             };
 
             const relativePointer = () => stage.getRelativePointerPosition();
@@ -813,6 +878,7 @@
                 contentLayer.batchDraw();
                 if (transformer.nodes().length) {
                     markModified();
+                    saveHistory();
                 }
             };
 
@@ -825,6 +891,7 @@
                 contentLayer.batchDraw();
                 if (transformer.nodes().some(supportsFill)) {
                     markModified();
+                    saveHistory();
                 }
             };
 
@@ -838,6 +905,7 @@
                 contentLayer.batchDraw();
                 if (transformer.nodes().some(supportsStrokeStyle)) {
                     markModified();
+                    saveHistory();
                 }
             };
 
@@ -849,6 +917,7 @@
                 shape.fill(activeFill || null);
                 contentLayer.batchDraw();
                 markModified();
+                saveHistory();
             };
 
             const applyFillAtPointer = (target) => {
@@ -862,7 +931,7 @@
                     return;
                 }
 
-                const shapes = contentLayer.getChildren().toArray().reverse();
+                const shapes = Array.from(contentLayer.getChildren()).reverse();
                 const shape = shapes.find((node) => {
                     if (!supportsFill(node)) {
                         return false;
@@ -951,6 +1020,7 @@
                                 draggable: false,
                             }));
                         }
+                        saveHistory();
                     }
 
                     contentLayer.batchDraw();
@@ -1105,6 +1175,9 @@
             };
 
             const finishPointerAction = () => {
+                if (actionChanged) {
+                    saveHistory();
+                }
                 drawing = false;
                 panning = false;
                 erasing = false;
@@ -1198,6 +1271,7 @@
             resizeStage();
             requestAnimationFrame(resizeStage);
             updateShapeInteraction();
+            saveHistory(true);
             zoomText.textContent = `${Math.round(stage.scaleX() * 100)}%`;
 
             toolButtons.forEach((button) => button.addEventListener('click', () => setTool(button.dataset.tool)));
@@ -1241,6 +1315,7 @@
             }));
 
             boardNameInput.addEventListener('input', markModified);
+            undoButton.addEventListener('click', undo);
             document.getElementById('save').addEventListener('click', () => saveCanvas(false));
             document.getElementById('reset-view').addEventListener('click', resetView);
             document.getElementById('zoom-in').addEventListener('click', () => applyZoom(stage.scaleX() + 0.1));
@@ -1317,6 +1392,7 @@
             stage.on('dragend transformend', (event) => {
                 if (isSelectable(event.target)) {
                     markModified();
+                    saveHistory();
                 }
             });
             stage.on('dblclick dbltap', (event) => {
@@ -1332,6 +1408,12 @@
             });
 
             window.addEventListener('keydown', (event) => {
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+                    event.preventDefault();
+                    undo();
+                    return;
+                }
+
                 if ((event.key === 'Delete' || event.key === 'Backspace') &&
                     transformer.nodes().length &&
                     document.activeElement !== boardNameInput &&
@@ -1341,6 +1423,7 @@
                     selectShape(null);
                     contentLayer.batchDraw();
                     markModified();
+                    saveHistory();
                 }
             });
             document.addEventListener('DOMContentLoaded', resizeStage);
