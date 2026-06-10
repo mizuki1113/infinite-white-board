@@ -10,10 +10,26 @@ class BoardTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_board_index_displays_saved_boards_and_management_forms(): void
+    {
+        $board = Board::create(['name' => 'Project map']);
+
+        $this->get('/boards')
+            ->assertOk()
+            ->assertViewIs('boards.index')
+            ->assertViewHas('boards')
+            ->assertSee('Infinite Canvas Whiteboard')
+            ->assertSee('Project map')
+            ->assertSee(route('boards.store'), false)
+            ->assertSee(route('boards.show', $board), false)
+            ->assertSee(route('boards.update', $board), false)
+            ->assertSee(route('boards.destroy', $board), false);
+    }
+
     public function test_web_routes_manage_boards(): void
     {
-        $this->get('/')->assertOk()->assertExactJson([]);
-        $this->get('/boards')->assertOk()->assertExactJson([]);
+        $this->get('/')->assertOk()->assertViewIs('boards.index');
+        $this->getJson('/boards')->assertOk()->assertExactJson([]);
 
         $created = $this->postJson('/boards', [
             'name' => 'Planning',
@@ -22,9 +38,18 @@ class BoardTest extends TestCase
 
         $boardId = $created->json('id');
 
-        $this->getJson("/boards/{$boardId}")
+        $this->get("/boards/{$boardId}")
             ->assertOk()
-            ->assertJsonPath('canvas_data', '{"objects":[]}');
+            ->assertViewIs('boards.show')
+            ->assertViewHas('board')
+            ->assertSee('Konva')
+            ->assertSee('Planning')
+            ->assertSee('id="canvas-container"', false)
+            ->assertSee('id="custom-color"', false)
+            ->assertSee('← Back')
+            ->assertSee('body.light-mode #canvas-container')
+            ->assertSee('whiteboard-theme')
+            ->assertSee(str_replace('/', '\/', route('api.boards.update', $boardId)), false);
 
         $this->putJson("/boards/{$boardId}", [
             'name' => 'Planning updated',
@@ -34,6 +59,32 @@ class BoardTest extends TestCase
         $this->deleteJson("/boards/{$boardId}")->assertNoContent();
 
         $this->assertDatabaseMissing('boards', ['id' => $boardId]);
+    }
+
+    public function test_web_forms_redirect_and_display_validation_errors(): void
+    {
+        $this->post('/boards', ['name' => 'Planning'])
+            ->assertRedirect(route('boards.index'))
+            ->assertSessionHas('success');
+
+        $board = Board::where('name', 'Planning')->firstOrFail();
+
+        $this->put("/boards/{$board->id}", ['name' => 'Planning updated'])
+            ->assertRedirect(route('boards.index'))
+            ->assertSessionHas('success');
+
+        $this->post('/boards', ['name' => 'Planning updated'])
+            ->assertRedirect()
+            ->assertSessionHasErrors('name');
+
+        $this->followingRedirects()
+            ->post('/boards', ['name' => 'Planning updated'])
+            ->assertOk()
+            ->assertSee('The name has already been taken.');
+
+        $this->delete("/boards/{$board->id}")
+            ->assertRedirect(route('boards.index'))
+            ->assertSessionHas('success');
     }
 
     public function test_api_routes_return_json_and_manage_boards(): void
@@ -53,6 +104,7 @@ class BoardTest extends TestCase
 
         $this->getJson("/api/boards/{$boardId}")
             ->assertOk()
+            ->assertHeader('content-type', 'application/json')
             ->assertJsonPath('id', $boardId);
 
         $this->putJson("/api/boards/{$boardId}", [
