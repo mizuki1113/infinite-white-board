@@ -53,6 +53,13 @@ class BoardTest extends TestCase
             ->assertSee('const resizeStage')
             ->assertSee('stage.container().getBoundingClientRect()')
             ->assertSee('transform.invert()')
+            ->assertSee('data-tool="eraser"', false)
+            ->assertSee('data-tool="fill"', false)
+            ->assertSee('id="fill-color"', false)
+            ->assertSee('id="no-fill"', false)
+            ->assertSee('data-eraser-size="52"', false)
+            ->assertSee('destination-out')
+            ->assertSee('data-brush="highlighter"', false)
             ->assertSee('whiteboard-theme')
             ->assertSee(str_replace('/', '\/', route('api.boards.update', $boardId)), false);
 

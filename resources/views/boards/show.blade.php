@@ -284,6 +284,43 @@
             cursor: pointer;
         }
 
+        .control-options {
+            display: grid;
+            gap: 4px;
+            padding: 0 7px 12px;
+        }
+
+        .control-button {
+            min-height: 27px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.62rem;
+            font-weight: 700;
+        }
+
+        .control-button:hover, .control-button.active {
+            border-color: var(--border-color);
+            background: var(--tool-active-bg);
+            color: var(--text-primary);
+        }
+
+        .fill-preview {
+            display: block;
+            width: 38px;
+            height: 24px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background:
+                linear-gradient(45deg, #b7b7b7 25%, transparent 25%),
+                linear-gradient(-45deg, #b7b7b7 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #b7b7b7 75%),
+                linear-gradient(-45deg, transparent 75%, #b7b7b7 75%);
+            background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+            background-size: 12px 12px;
+        }
+
         .width-options {
             display: grid;
             gap: 4px;
@@ -489,6 +526,8 @@
         <button class="tool-button" type="button" data-tool="line"><span class="tool-icon">╱</span><span>Line</span></button>
         <button class="tool-button" type="button" data-tool="arrow"><span class="tool-icon">→</span><span>Arrow</span></button>
         <button class="tool-button" type="button" data-tool="text"><span class="tool-icon">T</span><span>Text</span></button>
+        <button class="tool-button" type="button" data-tool="fill"><span class="tool-icon">▣</span><span>Fill</span></button>
+        <button class="tool-button" type="button" data-tool="eraser"><span class="tool-icon">⌫</span><span>Eraser</span></button>
 
         <div class="sidebar-divider"></div>
         <p class="sidebar-label">STROKE</p>
@@ -509,10 +548,39 @@
             <input id="custom-color" type="color" value="#4a90e2" aria-label="Custom stroke color">
         </label>
 
+        <p class="sidebar-label">FILL</p>
+        <label id="fill-color-control" class="custom-color">
+            <span>Fill color</span>
+            <input id="fill-color" type="color" value="#ffffff" aria-label="Fill color">
+        </label>
+        <div class="control-options">
+            <button id="no-fill" class="control-button active" type="button">
+                <span class="fill-preview" aria-hidden="true"></span>
+                No Fill
+            </button>
+        </div>
+
+        <p class="sidebar-label">ERASER SIZE</p>
+        <div class="control-options" aria-label="Eraser size">
+            <button class="control-button eraser-size-button" type="button" data-eraser-size="12">Small</button>
+            <button class="control-button eraser-size-button active" type="button" data-eraser-size="28">Medium</button>
+            <button class="control-button eraser-size-button" type="button" data-eraser-size="52">Large</button>
+        </div>
+
+        <p class="sidebar-label">WIDTH</p>
         <div class="width-options" aria-label="Stroke width">
             <button class="width-button" type="button" data-width="2">Thin</button>
             <button class="width-button active" type="button" data-width="5">Medium</button>
             <button class="width-button" type="button" data-width="10">Thick</button>
+        </div>
+
+        <p class="sidebar-label">BRUSH</p>
+        <div class="control-options" aria-label="Brush stroke style">
+            <button class="control-button brush-button active" type="button" data-brush="solid">Solid</button>
+            <button class="control-button brush-button" type="button" data-brush="dashed">Dashed</button>
+            <button class="control-button brush-button" type="button" data-brush="dotted">Dotted</button>
+            <button class="control-button brush-button" type="button" data-brush="marker">Marker</button>
+            <button class="control-button brush-button" type="button" data-brush="highlighter">Highlighter</button>
         </div>
     </aside>
 
@@ -548,8 +616,13 @@
             const toolButtons = Array.from(document.querySelectorAll('.tool-button'));
             const swatches = Array.from(document.querySelectorAll('.swatch'));
             const widthButtons = Array.from(document.querySelectorAll('.width-button'));
+            const brushButtons = Array.from(document.querySelectorAll('.brush-button'));
+            const eraserSizeButtons = Array.from(document.querySelectorAll('.eraser-size-button'));
             const customColorControl = document.getElementById('custom-color-control');
             const customColorInput = document.getElementById('custom-color');
+            const fillColorControl = document.getElementById('fill-color-control');
+            const fillColorInput = document.getElementById('fill-color');
+            const noFillButton = document.getElementById('no-fill');
 
             let stage;
             let contentLayer;
@@ -557,9 +630,13 @@
             let transformer;
             let activeTool = 'select';
             let activeColor = '#4a90e2';
+            let activeFill = '';
             let activeWidth = 5;
+            let activeBrush = 'solid';
+            let activeEraserSize = 28;
             let drawing = false;
             let panning = false;
+            let erasing = false;
             let draft = null;
             let startPoint = null;
             let panStart = null;
@@ -636,18 +713,78 @@
 
             const relativePointer = () => stage.getRelativePointerPosition();
 
+            const supportsFill = (node) => node instanceof Konva.Rect || node instanceof Konva.Ellipse ||
+                node instanceof Konva.Arrow || node instanceof Konva.Text;
+
+            const supportsStrokeStyle = (node) => isSelectable(node) && !(node instanceof Konva.Text) &&
+                !node.getAttr('isEraserStroke');
+
+            const brushAttrs = () => {
+                const attrs = {
+                    brushStyle: activeBrush,
+                    dash: [],
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    opacity: 1,
+                    strokeWidth: activeWidth,
+                };
+
+                if (activeBrush === 'dashed') {
+                    attrs.dash = [14, 8];
+                } else if (activeBrush === 'dotted') {
+                    attrs.dash = [1, 10];
+                } else if (activeBrush === 'marker') {
+                    attrs.strokeWidth = activeWidth * 1.5;
+                } else if (activeBrush === 'highlighter') {
+                    attrs.strokeWidth = activeWidth * 2.5;
+                    attrs.opacity = 0.35;
+                }
+
+                return attrs;
+            };
+
+            const syncControlsFromShape = (shape) => {
+                if (!shape) {
+                    return;
+                }
+
+                const strokeColor = shape instanceof Konva.Text ? shape.fill() : shape.stroke();
+                if (strokeColor) {
+                    activeColor = strokeColor;
+                    customColorInput.value = strokeColor;
+                    swatches.forEach((item) => item.classList.toggle('active', item.dataset.color === strokeColor));
+                    customColorControl.classList.toggle('active', !swatches.some((item) => item.dataset.color === strokeColor));
+                }
+
+                if (supportsFill(shape)) {
+                    activeFill = shape.fill() || '';
+                    noFillButton.classList.toggle('active', !activeFill);
+                    fillColorControl.classList.toggle('active', Boolean(activeFill));
+                    if (activeFill) {
+                        fillColorInput.value = activeFill;
+                    }
+                }
+
+                if (supportsStrokeStyle(shape)) {
+                    activeBrush = shape.getAttr('brushStyle') || 'solid';
+                    brushButtons.forEach((button) => button.classList.toggle('active', button.dataset.brush === activeBrush));
+                }
+            };
+
             const selectShape = (shape) => {
                 transformer.nodes(shape ? [shape] : []);
+                syncControlsFromShape(shape);
                 uiLayer.batchDraw();
             };
 
             const isSelectable = (node) => node && node !== stage && node !== contentLayer && node !== uiLayer &&
-                node !== transformer && !(node.getParent() instanceof Konva.Transformer);
+                node !== transformer && !(node.getParent() instanceof Konva.Transformer) && !node.getAttr('isEraserStroke');
 
             const updateShapeInteraction = () => {
                 const selecting = activeTool === 'select';
-                contentLayer.getChildren().forEach((node) => node.draggable(selecting));
-                container.style.cursor = selecting ? 'default' : 'crosshair';
+                contentLayer.getChildren().forEach((node) => node.draggable(selecting && !node.getAttr('isEraserStroke')));
+                container.style.cursor = selecting ? 'default' : activeTool === 'eraser' ? 'cell' :
+                    activeTool === 'fill' ? 'copy' : 'crosshair';
 
                 if (!selecting) {
                     selectShape(null);
@@ -660,13 +797,84 @@
                 updateShapeInteraction();
             };
 
-            const commonAttrs = () => ({
+            const commonAttrs = () => Object.assign({
                 stroke: activeColor,
-                strokeWidth: activeWidth,
-                lineCap: 'round',
-                lineJoin: 'round',
                 draggable: false,
-            });
+            }, brushAttrs());
+
+            const applyStrokeColorToSelection = () => {
+                transformer.nodes().forEach((node) => {
+                    if (node instanceof Konva.Text) {
+                        node.fill(activeColor);
+                    } else if (supportsStrokeStyle(node)) {
+                        node.stroke(activeColor);
+                    }
+                });
+                contentLayer.batchDraw();
+                if (transformer.nodes().length) {
+                    markModified();
+                }
+            };
+
+            const applyFillToSelection = () => {
+                transformer.nodes().forEach((node) => {
+                    if (supportsFill(node)) {
+                        node.fill(activeFill || null);
+                    }
+                });
+                contentLayer.batchDraw();
+                if (transformer.nodes().some(supportsFill)) {
+                    markModified();
+                }
+            };
+
+            const applyBrushToSelection = () => {
+                const attrs = brushAttrs();
+                transformer.nodes().forEach((node) => {
+                    if (supportsStrokeStyle(node)) {
+                        node.setAttrs(attrs);
+                    }
+                });
+                contentLayer.batchDraw();
+                if (transformer.nodes().some(supportsStrokeStyle)) {
+                    markModified();
+                }
+            };
+
+            const applyFillToShape = (shape) => {
+                if (!supportsFill(shape)) {
+                    return;
+                }
+
+                shape.fill(activeFill || null);
+                contentLayer.batchDraw();
+                markModified();
+            };
+
+            const applyFillAtPointer = (target) => {
+                if (supportsFill(target)) {
+                    applyFillToShape(target);
+                    return;
+                }
+
+                const pointer = stage.getPointerPosition();
+                if (!pointer) {
+                    return;
+                }
+
+                const shapes = contentLayer.getChildren().toArray().reverse();
+                const shape = shapes.find((node) => {
+                    if (!supportsFill(node)) {
+                        return false;
+                    }
+
+                    const rect = node.getClientRect();
+                    return pointer.x >= rect.x && pointer.x <= rect.x + rect.width &&
+                        pointer.y >= rect.y && pointer.y <= rect.y + rect.height;
+                });
+
+                applyFillToShape(shape);
+            };
 
             const addShape = (shape) => {
                 contentLayer.add(shape);
@@ -781,6 +989,27 @@
             };
 
             const beginDrawing = () => {
+                if (activeTool === 'eraser') {
+                    const point = relativePointer();
+                    if (!point) {
+                        return;
+                    }
+
+                    erasing = true;
+                    draft = addShape(new Konva.Line({
+                        points: [point.x, point.y, point.x, point.y],
+                        stroke: '#000000',
+                        strokeWidth: activeEraserSize,
+                        lineCap: 'round',
+                        lineJoin: 'round',
+                        globalCompositeOperation: 'destination-out',
+                        isEraserStroke: true,
+                        listening: false,
+                        draggable: false,
+                    }));
+                    return;
+                }
+
                 if (activeTool === 'text') {
                     const pointer = stage.getPointerPosition();
                     if (!pointer) {
@@ -814,6 +1043,7 @@
                         y: point.y,
                         width: 0,
                         height: 0,
+                        fill: activeFill || null,
                     })));
                 } else if (activeTool === 'circle') {
                     draft = addShape(new Konva.Ellipse(Object.assign({}, attrs, {
@@ -821,6 +1051,7 @@
                         y: point.y,
                         radiusX: 0,
                         radiusY: 0,
+                        fill: activeFill || null,
                     })));
                 } else if (activeTool === 'line') {
                     draft = addShape(new Konva.Line(Object.assign({}, attrs, {
@@ -831,12 +1062,21 @@
                         points: [point.x, point.y, point.x, point.y],
                         pointerLength: Math.max(8, activeWidth * 3),
                         pointerWidth: Math.max(8, activeWidth * 3),
+                        fill: activeFill || null,
                     })));
                 }
             };
 
             const continueDrawing = () => {
                 if (!drawing || !draft) {
+                    if (erasing && draft) {
+                        const point = relativePointer();
+                        if (point) {
+                            draft.points(draft.points().concat([point.x, point.y]));
+                            contentLayer.batchDraw();
+                            markModified();
+                        }
+                    }
                     return;
                 }
 
@@ -867,10 +1107,12 @@
             const finishPointerAction = () => {
                 drawing = false;
                 panning = false;
+                erasing = false;
                 draft = null;
                 startPoint = null;
                 panStart = null;
-                container.style.cursor = activeTool === 'select' ? 'default' : 'crosshair';
+                container.style.cursor = activeTool === 'select' ? 'default' : activeTool === 'eraser' ? 'cell' :
+                    activeTool === 'fill' ? 'copy' : 'crosshair';
             };
 
             const applyZoom = (newScale, focalPoint = null) => {
@@ -963,15 +1205,39 @@
                 activeColor = swatch.dataset.color;
                 swatches.forEach((item) => item.classList.toggle('active', item === swatch));
                 customColorControl.classList.remove('active');
+                applyStrokeColorToSelection();
             }));
             customColorInput.addEventListener('input', () => {
                 activeColor = customColorInput.value;
                 swatches.forEach((item) => item.classList.remove('active'));
                 customColorControl.classList.add('active');
+                applyStrokeColorToSelection();
+            });
+            fillColorInput.addEventListener('input', () => {
+                activeFill = fillColorInput.value;
+                fillColorControl.classList.add('active');
+                noFillButton.classList.remove('active');
+                applyFillToSelection();
+            });
+            noFillButton.addEventListener('click', () => {
+                activeFill = '';
+                fillColorControl.classList.remove('active');
+                noFillButton.classList.add('active');
+                applyFillToSelection();
             });
             widthButtons.forEach((button) => button.addEventListener('click', () => {
                 activeWidth = Number(button.dataset.width);
                 widthButtons.forEach((item) => item.classList.toggle('active', item === button));
+                applyBrushToSelection();
+            }));
+            brushButtons.forEach((button) => button.addEventListener('click', () => {
+                activeBrush = button.dataset.brush;
+                brushButtons.forEach((item) => item.classList.toggle('active', item === button));
+                applyBrushToSelection();
+            }));
+            eraserSizeButtons.forEach((button) => button.addEventListener('click', () => {
+                activeEraserSize = Number(button.dataset.eraserSize);
+                eraserSizeButtons.forEach((item) => item.classList.toggle('active', item === button));
             }));
 
             boardNameInput.addEventListener('input', markModified);
@@ -1000,6 +1266,18 @@
                     return;
                 }
 
+                if (activeTool === 'eraser') {
+                    event.evt.preventDefault();
+                    beginDrawing();
+                    return;
+                }
+
+                if (activeTool === 'fill') {
+                    event.evt.preventDefault();
+                    applyFillAtPointer(event.target);
+                    return;
+                }
+
                 if (activeTool === 'select') {
                     if (event.target === stage) {
                         selectShape(null);
@@ -1024,6 +1302,11 @@
                         y: panStart.position.y + pointer.y - panStart.pointer.y,
                     });
                     stage.batchDraw();
+                    return;
+                }
+
+                if (erasing) {
+                    continueDrawing();
                     return;
                 }
 
