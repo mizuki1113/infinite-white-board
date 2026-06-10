@@ -226,6 +226,17 @@
             line-height: 1;
         }
 
+        .tool-icon svg {
+            display: block;
+            width: 17px;
+            height: 17px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.8;
+        }
+
         .sidebar-divider {
             height: 1px;
             margin: 7px 10px 11px;
@@ -320,6 +331,19 @@
             border-color: var(--border-color);
             background: var(--tool-active-bg);
             color: var(--text-primary);
+        }
+
+        .sidebar-select {
+            width: calc(100% - 14px);
+            min-height: 30px;
+            margin: 0 7px 12px;
+            padding: 4px 5px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--btn-bg);
+            color: var(--text-primary);
+            font-size: 0.63rem;
+            font-weight: 700;
         }
 
         .fill-preview {
@@ -543,8 +567,18 @@
         <button class="tool-button" type="button" data-tool="line"><span class="tool-icon">╱</span><span>Line</span></button>
         <button class="tool-button" type="button" data-tool="arrow"><span class="tool-icon">→</span><span>Arrow</span></button>
         <button class="tool-button" type="button" data-tool="text"><span class="tool-icon">T</span><span>Text</span></button>
-        <button class="tool-button" type="button" data-tool="fill"><span class="tool-icon">▣</span><span>Fill</span></button>
-        <button class="tool-button" type="button" data-tool="eraser"><span class="tool-icon">⌫</span><span>Eraser</span></button>
+        <button class="tool-button" type="button" data-tool="fill">
+            <span class="tool-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m7 4 10 10-6 6-8-8 6-6"/><path d="m7 4 2-2 2 2"/><path d="M15 20h6"/><path d="M19 14s2 2.2 2 3.5a2 2 0 0 1-4 0C17 16.2 19 14 19 14Z"/></svg>
+            </span>
+            <span>Fill</span>
+        </button>
+        <button class="tool-button" type="button" data-tool="eraser">
+            <span class="tool-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m15 4 5 5-9.5 9.5a3 3 0 0 1-4.2 0l-.8-.8a3 3 0 0 1 0-4.2L15 4Z"/><path d="m12 7 5 5"/><path d="M10 19h10"/></svg>
+            </span>
+            <span>Eraser</span>
+        </button>
 
         <div class="sidebar-divider"></div>
         <p class="sidebar-label">STROKE</p>
@@ -565,40 +599,28 @@
             <input id="custom-color" type="color" value="#4a90e2" aria-label="Custom stroke color">
         </label>
 
-        <p class="sidebar-label">FILL</p>
-        <label id="fill-color-control" class="custom-color">
-            <span>Fill color</span>
-            <input id="fill-color" type="color" value="#ffffff" aria-label="Fill color">
-        </label>
-        <div class="control-options">
-            <button id="no-fill" class="control-button active" type="button">
-                <span class="fill-preview" aria-hidden="true"></span>
-                No Fill
-            </button>
-        </div>
+        <p class="sidebar-label">SIZE</p>
+        <select id="stroke-width" class="sidebar-select" aria-label="Stroke width">
+            <option value="2">Thin</option>
+            <option value="5" selected>Medium</option>
+            <option value="10">Thick</option>
+        </select>
+
+        <p class="sidebar-label">STYLE</p>
+        <select id="brush-style" class="sidebar-select" aria-label="Brush stroke style">
+            <option value="solid">Solid</option>
+            <option value="dashed">Dashed</option>
+            <option value="dotted">Dotted</option>
+            <option value="marker">Marker</option>
+            <option value="highlighter">Highlighter</option>
+        </select>
 
         <p class="sidebar-label">ERASER SIZE</p>
-        <div class="control-options" aria-label="Eraser size">
-            <button class="control-button eraser-size-button" type="button" data-eraser-size="12">Small</button>
-            <button class="control-button eraser-size-button active" type="button" data-eraser-size="28">Medium</button>
-            <button class="control-button eraser-size-button" type="button" data-eraser-size="52">Large</button>
-        </div>
-
-        <p class="sidebar-label">WIDTH</p>
-        <div class="width-options" aria-label="Stroke width">
-            <button class="width-button" type="button" data-width="2">Thin</button>
-            <button class="width-button active" type="button" data-width="5">Medium</button>
-            <button class="width-button" type="button" data-width="10">Thick</button>
-        </div>
-
-        <p class="sidebar-label">BRUSH</p>
-        <div class="control-options" aria-label="Brush stroke style">
-            <button class="control-button brush-button active" type="button" data-brush="solid">Solid</button>
-            <button class="control-button brush-button" type="button" data-brush="dashed">Dashed</button>
-            <button class="control-button brush-button" type="button" data-brush="dotted">Dotted</button>
-            <button class="control-button brush-button" type="button" data-brush="marker">Marker</button>
-            <button class="control-button brush-button" type="button" data-brush="highlighter">Highlighter</button>
-        </div>
+        <select id="eraser-size" class="sidebar-select" aria-label="Eraser size">
+            <option value="12">Small</option>
+            <option value="28" selected>Medium</option>
+            <option value="52">Large</option>
+        </select>
     </aside>
 
     <main class="canvas-area">
@@ -633,14 +655,11 @@
             const status = document.getElementById('status');
             const toolButtons = Array.from(document.querySelectorAll('.tool-button'));
             const swatches = Array.from(document.querySelectorAll('.swatch'));
-            const widthButtons = Array.from(document.querySelectorAll('.width-button'));
-            const brushButtons = Array.from(document.querySelectorAll('.brush-button'));
-            const eraserSizeButtons = Array.from(document.querySelectorAll('.eraser-size-button'));
+            const strokeWidthInput = document.getElementById('stroke-width');
+            const brushStyleInput = document.getElementById('brush-style');
+            const eraserSizeInput = document.getElementById('eraser-size');
             const customColorControl = document.getElementById('custom-color-control');
             const customColorInput = document.getElementById('custom-color');
-            const fillColorControl = document.getElementById('fill-color-control');
-            const fillColorInput = document.getElementById('fill-color');
-            const noFillButton = document.getElementById('no-fill');
 
             let stage;
             let contentLayer;
@@ -648,7 +667,6 @@
             let transformer;
             let activeTool = 'select';
             let activeColor = '#4a90e2';
-            let activeFill = '';
             let activeWidth = 5;
             let activeBrush = 'solid';
             let activeEraserSize = 28;
@@ -778,8 +796,70 @@
 
             const relativePointer = () => stage.getRelativePointerPosition();
 
+            const isFreehandLine = (node) => node instanceof Konva.Line && !(node instanceof Konva.Arrow) &&
+                (node.getAttr('isFreehand') || node.tension() > 0);
+
             const supportsFill = (node) => node instanceof Konva.Rect || node instanceof Konva.Ellipse ||
-                node instanceof Konva.Arrow || node instanceof Konva.Text;
+                node instanceof Konva.Arrow || node instanceof Konva.Text || isFreehandLine(node);
+
+            const canCloseFreehand = (line) => {
+                const points = line.points();
+                if (points.length < 6) {
+                    return false;
+                }
+
+                const distance = Math.hypot(
+                    points[points.length - 2] - points[0],
+                    points[points.length - 1] - points[1],
+                );
+
+                return distance <= 35;
+            };
+
+            const closeFreehandIfNeeded = (line) => {
+                if (isFreehandLine(line) && !line.closed() && canCloseFreehand(line)) {
+                    line.closed(true);
+                }
+            };
+
+            const pointInPolygon = (point, points) => {
+                let inside = false;
+                for (let current = 0, previous = points.length - 2; current < points.length; current += 2) {
+                    const currentX = points[current];
+                    const currentY = points[current + 1];
+                    const previousX = points[previous];
+                    const previousY = points[previous + 1];
+                    const intersects = currentY > point.y !== previousY > point.y &&
+                        point.x < ((previousX - currentX) * (point.y - currentY)) /
+                        (previousY - currentY || Number.EPSILON) + currentX;
+
+                    if (intersects) {
+                        inside = !inside;
+                    }
+                    previous = current;
+                }
+                return inside;
+            };
+
+            const pointerInsideShape = (shape, pointer) => {
+                const transform = shape.getAbsoluteTransform().copy();
+                transform.invert();
+                const localPoint = transform.point(pointer);
+
+                if (isFreehandLine(shape) && shape.closed()) {
+                    return pointInPolygon(localPoint, shape.points());
+                }
+                if (shape instanceof Konva.Rect) {
+                    return localPoint.x >= 0 && localPoint.x <= shape.width() &&
+                        localPoint.y >= 0 && localPoint.y <= shape.height();
+                }
+                if (shape instanceof Konva.Ellipse) {
+                    return (localPoint.x * localPoint.x) / (shape.radiusX() * shape.radiusX()) +
+                        (localPoint.y * localPoint.y) / (shape.radiusY() * shape.radiusY()) <= 1;
+                }
+
+                return false;
+            };
 
             const supportsStrokeStyle = (node) => isSelectable(node) && !(node instanceof Konva.Text) &&
                 !node.getAttr('isEraserStroke');
@@ -821,18 +901,10 @@
                     customColorControl.classList.toggle('active', !swatches.some((item) => item.dataset.color === strokeColor));
                 }
 
-                if (supportsFill(shape)) {
-                    activeFill = shape.fill() || '';
-                    noFillButton.classList.toggle('active', !activeFill);
-                    fillColorControl.classList.toggle('active', Boolean(activeFill));
-                    if (activeFill) {
-                        fillColorInput.value = activeFill;
-                    }
-                }
-
                 if (supportsStrokeStyle(shape)) {
                     activeBrush = shape.getAttr('brushStyle') || 'solid';
-                    brushButtons.forEach((button) => button.classList.toggle('active', button.dataset.brush === activeBrush));
+                    brushStyleInput.value = activeBrush;
+                    strokeWidthInput.value = String(activeWidth);
                 }
             };
 
@@ -883,13 +955,19 @@
             };
 
             const applyFillToSelection = () => {
+                let changed = false;
                 transformer.nodes().forEach((node) => {
                     if (supportsFill(node)) {
-                        node.fill(activeFill || null);
+                        if (isFreehandLine(node) && !node.closed()) {
+                            showStatus('This freehand line is open. Draw a closed loop to fill it.', true);
+                            return;
+                        }
+                        node.fill(activeColor);
+                        changed = true;
                     }
                 });
                 contentLayer.batchDraw();
-                if (transformer.nodes().some(supportsFill)) {
+                if (changed) {
                     markModified();
                     saveHistory();
                 }
@@ -914,7 +992,12 @@
                     return;
                 }
 
-                shape.fill(activeFill || null);
+                if (isFreehandLine(shape) && !shape.closed()) {
+                    showStatus('This freehand line is open. Draw a closed loop to fill it.', true);
+                    return;
+                }
+
+                shape.fill(activeColor);
                 contentLayer.batchDraw();
                 markModified();
                 saveHistory();
@@ -936,13 +1019,15 @@
                     if (!supportsFill(node)) {
                         return false;
                     }
-
-                    const rect = node.getClientRect();
-                    return pointer.x >= rect.x && pointer.x <= rect.x + rect.width &&
-                        pointer.y >= rect.y && pointer.y <= rect.y + rect.height;
+                    if (isFreehandLine(node) && !node.closed()) {
+                        return false;
+                    }
+                    return pointerInsideShape(node, pointer);
                 });
 
-                applyFillToShape(shape);
+                if (shape) {
+                    applyFillToShape(shape);
+                }
             };
 
             const addShape = (shape) => {
@@ -1106,6 +1191,7 @@
                     draft = addShape(new Konva.Line(Object.assign({}, attrs, {
                         points: [point.x, point.y],
                         tension: 0.25,
+                        isFreehand: true,
                     })));
                 } else if (activeTool === 'rectangle') {
                     draft = addShape(new Konva.Rect(Object.assign({}, attrs, {
@@ -1113,7 +1199,7 @@
                         y: point.y,
                         width: 0,
                         height: 0,
-                        fill: activeFill || null,
+                        fill: null,
                     })));
                 } else if (activeTool === 'circle') {
                     draft = addShape(new Konva.Ellipse(Object.assign({}, attrs, {
@@ -1121,7 +1207,7 @@
                         y: point.y,
                         radiusX: 0,
                         radiusY: 0,
-                        fill: activeFill || null,
+                        fill: null,
                     })));
                 } else if (activeTool === 'line') {
                     draft = addShape(new Konva.Line(Object.assign({}, attrs, {
@@ -1132,7 +1218,7 @@
                         points: [point.x, point.y, point.x, point.y],
                         pointerLength: Math.max(8, activeWidth * 3),
                         pointerWidth: Math.max(8, activeWidth * 3),
-                        fill: activeFill || null,
+                        fill: null,
                     })));
                 }
             };
@@ -1175,6 +1261,9 @@
             };
 
             const finishPointerAction = () => {
+                if (activeTool === 'freehand' && draft) {
+                    closeFreehandIfNeeded(draft);
+                }
                 if (actionChanged) {
                     saveHistory();
                 }
@@ -1287,32 +1376,17 @@
                 customColorControl.classList.add('active');
                 applyStrokeColorToSelection();
             });
-            fillColorInput.addEventListener('input', () => {
-                activeFill = fillColorInput.value;
-                fillColorControl.classList.add('active');
-                noFillButton.classList.remove('active');
-                applyFillToSelection();
-            });
-            noFillButton.addEventListener('click', () => {
-                activeFill = '';
-                fillColorControl.classList.remove('active');
-                noFillButton.classList.add('active');
-                applyFillToSelection();
-            });
-            widthButtons.forEach((button) => button.addEventListener('click', () => {
-                activeWidth = Number(button.dataset.width);
-                widthButtons.forEach((item) => item.classList.toggle('active', item === button));
+            strokeWidthInput.addEventListener('change', () => {
+                activeWidth = Number(strokeWidthInput.value);
                 applyBrushToSelection();
-            }));
-            brushButtons.forEach((button) => button.addEventListener('click', () => {
-                activeBrush = button.dataset.brush;
-                brushButtons.forEach((item) => item.classList.toggle('active', item === button));
+            });
+            brushStyleInput.addEventListener('change', () => {
+                activeBrush = brushStyleInput.value;
                 applyBrushToSelection();
-            }));
-            eraserSizeButtons.forEach((button) => button.addEventListener('click', () => {
-                activeEraserSize = Number(button.dataset.eraserSize);
-                eraserSizeButtons.forEach((item) => item.classList.toggle('active', item === button));
-            }));
+            });
+            eraserSizeInput.addEventListener('change', () => {
+                activeEraserSize = Number(eraserSizeInput.value);
+            });
 
             boardNameInput.addEventListener('input', markModified);
             undoButton.addEventListener('click', undo);
