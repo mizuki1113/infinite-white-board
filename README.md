@@ -1,58 +1,153 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Infinite Canvas Whiteboard
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel and Konva.js infinite canvas whiteboard application inspired by Draw.io. This app allows users to create, open, edit, rename, delete, save, and reload whiteboard boards.
 
-## About Laravel
+## Tech Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+* Laravel
+* Blade Templates
+* Konva.js via CDN
+* SQLite Database
+* Vanilla JavaScript
+* Inline CSS
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Database
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+This project uses SQLite.
 
-## Learning Laravel
+In the `.env` file, set:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```env
+DB_CONNECTION=sqlite
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Create the SQLite database file at:
 
-## Contributing
+```text
+database/database.sqlite
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Setup Instructions
 
-## Code of Conduct
+1. Clone or download the project.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+2. Open the project folder in terminal:
 
-## Security Vulnerabilities
+```bash
+cd infinite-white-board
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+3. Install PHP dependencies:
 
-## License
+```bash
+composer install
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+4. Copy `.env.example` to `.env`:
+
+```bash
+copy .env.example .env
+```
+
+5. Generate the application key:
+
+```bash
+php artisan key:generate
+```
+
+6. Set the database connection in `.env`:
+
+```env
+DB_CONNECTION=sqlite
+```
+
+7. Create the SQLite database file:
+
+```bash
+type nul > database\database.sqlite
+```
+
+8. Run database migrations:
+
+```bash
+php artisan migrate
+```
+
+9. Start the Laravel development server:
+
+```bash
+php artisan serve
+```
+
+10. Open the app in the browser:
+
+```text
+http://localhost:8000
+```
+
+## Features
+
+* Full-screen infinite whiteboard
+* Pan canvas by dragging the background
+* Zoom in and out using mouse wheel
+* Zoom percentage indicator
+* Reset view button
+* Select tool
+* Freehand drawing tool
+* Rectangle tool
+* Circle tool
+* Line tool
+* Arrow tool
+* Text tool with inline text editing
+* Custom color picker
+* Preset color swatches
+* Stroke width selector: thin, medium, thick
+* Select, move, resize, and delete shapes
+* Save canvas state using Konva `stage.toJSON()`
+* Reload saved canvas state from the database
+* Create, open, rename, and delete boards
+* Board names are unique
+* Dark mode and light mode support
+* Auto-save every 60 seconds when the canvas is modified
+
+## API Routes
+
+The application includes the following board API routes:
+
+```text
+GET     /api/boards
+POST    /api/boards
+GET     /api/boards/{board}
+PUT     /api/boards/{board}
+DELETE  /api/boards/{board}
+```
+
+## Web Routes
+
+```text
+GET     /
+GET     /boards
+POST    /boards
+GET     /boards/{board}
+PUT     /boards/{board}
+DELETE  /boards/{board}
+```
+
+## Version Control
+
+This project uses Git and includes multiple meaningful commits throughout development.
+
+To check commits:
+
+```bash
+git log --oneline
+```
+
+## Notes
+
+* No user authentication is required.
+* Boards are identified by a unique board name.
+* Konva.js is loaded through CDN.
+* No Vue, React, Alpine, Tailwind, or separate frontend framework is used.
+* The `.env` file should not be committed.
+* Only `.env.example` should be included in the repository.
