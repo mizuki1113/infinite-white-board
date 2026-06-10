@@ -48,6 +48,11 @@ class BoardTest extends TestCase
             ->assertSee('id="custom-color"', false)
             ->assertSee('← Back')
             ->assertSee('body.light-mode #canvas-container')
+            ->assertSee('inline-text-editor')
+            ->assertDontSee('prompt(')
+            ->assertSee('const resizeStage')
+            ->assertSee('stage.container().getBoundingClientRect()')
+            ->assertSee('transform.invert()')
             ->assertSee('whiteboard-theme')
             ->assertSee(str_replace('/', '\/', route('api.boards.update', $boardId)), false);
 

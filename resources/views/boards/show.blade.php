@@ -327,7 +327,25 @@
         }
 
         body.light-mode #canvas-container {
-            background: #fafafa;
+            background: #ffffff;
+        }
+
+        .inline-text-editor {
+            position: fixed;
+            z-index: 9999;
+            min-width: 180px;
+            min-height: 42px;
+            padding: 7px 9px;
+            overflow: hidden;
+            border: 1px solid #4a90e2;
+            border-radius: 6px;
+            outline: 2px solid rgba(74, 144, 226, 0.22);
+            background: var(--bg-navbar);
+            color: var(--text-primary);
+            font-family: Arial, sans-serif;
+            line-height: 1.25;
+            resize: both;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
         }
 
         .bottom-overlay {
@@ -548,21 +566,26 @@
             let modified = false;
             let saving = false;
             let statusTimer = null;
-
-            const containerSize = () => ({
-                width: container.clientWidth,
-                height: container.clientHeight,
-            });
+            let textEditor = null;
 
             const createEmptyStage = () => {
-                const size = containerSize();
                 stage = new Konva.Stage({
                     container: 'canvas-container',
-                    width: size.width,
-                    height: size.height,
+                    width: container.clientWidth,
+                    height: container.clientHeight,
                 });
                 contentLayer = new Konva.Layer();
                 stage.add(contentLayer);
+            };
+
+            const resizeStage = () => {
+                if (!stage) {
+                    return;
+                }
+
+                stage.width(container.clientWidth);
+                stage.height(container.clientHeight);
+                stage.batchDraw();
             };
 
             const restoreStage = () => {
@@ -573,7 +596,6 @@
 
                 try {
                     stage = Konva.Node.create(savedCanvas, 'canvas-container');
-                    stage.size(containerSize());
                     stage.find('Transformer').forEach((node) => node.destroy());
                     contentLayer = stage.getLayers()[0];
 
@@ -653,24 +675,127 @@
                 return shape;
             };
 
+            const openTextEditor = (textPosition, pointerPosition, textNode = null) => {
+                if (textEditor) {
+                    textEditor.commit();
+                }
+
+                const textarea = document.createElement('textarea');
+                const containerRect = stage.container().getBoundingClientRect();
+                const viewportPoint = textNode
+                    ? (() => {
+                        const transformed = textNode.getAbsoluteTransform().point({ x: 0, y: 0 });
+                        return {
+                            x: containerRect.left + transformed.x,
+                            y: containerRect.top + transformed.y,
+                        };
+                    })()
+                    : {
+                        x: containerRect.left + pointerPosition.x,
+                        y: containerRect.top + pointerPosition.y,
+                    };
+                const fontSize = textNode ? textNode.fontSize() : Math.max(18, activeWidth * 5);
+                const textColor = textNode ? textNode.fill() : activeColor;
+                const originalText = textNode ? textNode.text() : '';
+                let cancelled = false;
+                let closed = false;
+
+                textarea.className = 'inline-text-editor';
+                textarea.value = originalText;
+                textarea.placeholder = 'Type text';
+                textarea.style.left = `${viewportPoint.x}px`;
+                textarea.style.top = `${viewportPoint.y}px`;
+                textarea.style.fontSize = `${fontSize}px`;
+                textarea.style.color = textColor;
+
+                if (textNode) {
+                    textarea.style.width = `${Math.max(180, textNode.width() * textNode.getAbsoluteScale().x + 20)}px`;
+                    textNode.hide();
+                    selectShape(null);
+                    contentLayer.batchDraw();
+                }
+
+                const closeEditor = (commit) => {
+                    if (closed) {
+                        return;
+                    }
+
+                    closed = true;
+                    const value = textarea.value.trim();
+                    textarea.remove();
+                    textEditor = null;
+
+                    if (textNode) {
+                        textNode.show();
+                    }
+
+                    if (commit && value) {
+                        if (textNode) {
+                            textNode.text(value);
+                            markModified();
+                        } else {
+                            addShape(new Konva.Text({
+                                x: textPosition.x,
+                                y: textPosition.y,
+                                text: value,
+                                fill: activeColor,
+                                fontSize,
+                                draggable: false,
+                            }));
+                        }
+                    }
+
+                    contentLayer.batchDraw();
+                };
+
+                textEditor = {
+                    commit: () => closeEditor(true),
+                    cancel: () => closeEditor(false),
+                };
+
+                textarea.addEventListener('keydown', (event) => {
+                    event.stopPropagation();
+
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        closeEditor(true);
+                    } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        cancelled = true;
+                        closeEditor(false);
+                    }
+                });
+                textarea.addEventListener('blur', () => {
+                    if (!cancelled) {
+                        closeEditor(true);
+                    }
+                });
+
+                document.body.appendChild(textarea);
+                setTimeout(() => {
+                    if (textarea.isConnected) {
+                        textarea.focus();
+                        textarea.select();
+                    }
+                }, 0);
+            };
+
             const beginDrawing = () => {
-                const point = relativePointer();
-                if (!point) {
+                if (activeTool === 'text') {
+                    const pointer = stage.getPointerPosition();
+                    if (!pointer) {
+                        return;
+                    }
+
+                    const transform = stage.getAbsoluteTransform().copy();
+                    transform.invert();
+                    const textPosition = transform.point(pointer);
+                    openTextEditor(textPosition, pointer);
                     return;
                 }
 
-                if (activeTool === 'text') {
-                    const value = prompt('Enter text:');
-                    if (value) {
-                        addShape(new Konva.Text({
-                            x: point.x,
-                            y: point.y,
-                            text: value,
-                            fill: activeColor,
-                            fontSize: Math.max(18, activeWidth * 5),
-                            draggable: false,
-                        }));
-                    }
+                const point = relativePointer();
+                if (!point) {
                     return;
                 }
 
@@ -828,6 +953,8 @@
             applyTheme(localStorage.getItem('whiteboard-theme') || 'dark-mode');
             restoreStage();
             createSelectionLayer();
+            resizeStage();
+            requestAnimationFrame(resizeStage);
             updateShapeInteraction();
             zoomText.textContent = `${Math.round(stage.scaleX() * 100)}%`;
 
@@ -862,6 +989,17 @@
             });
 
             stage.on('mousedown touchstart', (event) => {
+                if (textEditor) {
+                    textEditor.commit();
+                    return;
+                }
+
+                if (activeTool === 'text') {
+                    event.evt.preventDefault();
+                    beginDrawing();
+                    return;
+                }
+
                 if (activeTool === 'select') {
                     if (event.target === stage) {
                         selectShape(null);
@@ -900,12 +1038,8 @@
             });
             stage.on('dblclick dbltap', (event) => {
                 if (event.target instanceof Konva.Text) {
-                    const value = prompt('Edit text:', event.target.text());
-                    if (value !== null) {
-                        event.target.text(value);
-                        contentLayer.batchDraw();
-                        markModified();
-                    }
+                    event.evt.preventDefault();
+                    openTextEditor(null, null, event.target);
                 }
             });
             stage.on('wheel', (event) => {
@@ -917,7 +1051,8 @@
             window.addEventListener('keydown', (event) => {
                 if ((event.key === 'Delete' || event.key === 'Backspace') &&
                     transformer.nodes().length &&
-                    document.activeElement !== boardNameInput) {
+                    document.activeElement !== boardNameInput &&
+                    document.activeElement !== document.querySelector('.inline-text-editor')) {
                     event.preventDefault();
                     transformer.nodes().forEach((node) => node.destroy());
                     selectShape(null);
@@ -925,10 +1060,9 @@
                     markModified();
                 }
             });
-            window.addEventListener('resize', () => {
-                stage.size(containerSize());
-                stage.batchDraw();
-            });
+            document.addEventListener('DOMContentLoaded', resizeStage);
+            window.addEventListener('load', resizeStage);
+            window.addEventListener('resize', resizeStage);
             window.addEventListener('beforeunload', (event) => {
                 if (modified) {
                     event.preventDefault();
